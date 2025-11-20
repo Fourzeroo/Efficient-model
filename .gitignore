@@ -1,0 +1,51 @@
+# Виртуальное окружение
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Data files
+*.csv
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models and cache
+models/
+checkpoints/
+*.pth
+*.pt
+*.bin
+.cache/
+.claude
+
+# Клонированные репозитории
+Informer2020/
