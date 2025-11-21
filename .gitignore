@@ -24,7 +24,6 @@ build/
 *.csv
 *.h5
 *.hdf5
-*.pkl
 *.pickle
 
 # IDE
