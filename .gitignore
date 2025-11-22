@@ -48,3 +48,5 @@ checkpoints/
 
 # Клонированные репозитории
 Informer2020/
+
+.env

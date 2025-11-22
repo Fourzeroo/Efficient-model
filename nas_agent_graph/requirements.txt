@@ -1,0 +1,13 @@
+# LangGraph orchestration
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+
+# Pydantic for structured output
+pydantic>=2.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Existing nas_system dependencies (inherited)
+# torch, numpy, pandas, matplotlib, scikit-learn, PyYAML
