@@ -42,6 +42,12 @@ if not OPENROUTER_API_KEY:
         "Please set it in a .env file or as an environment variable."
     )
 
+# Phoenix Observability Configuration
+PHOENIX_ENABLED = os.getenv("PHOENIX_ENABLED", "true").lower() == "true"
+PHOENIX_HOST = os.getenv("PHOENIX_HOST", "localhost")
+PHOENIX_PORT = int(os.getenv("PHOENIX_PORT", "6006"))
+PHOENIX_COLLECTOR_ENDPOINT = f"http://{PHOENIX_HOST}:{PHOENIX_PORT}/v1/traces"
+
 # Debug settings
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 VERBOSE = os.getenv("VERBOSE", "true").lower() == "true"

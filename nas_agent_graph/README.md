@@ -10,6 +10,7 @@ This system provides an automated, LLM-driven approach to Neural Architecture Se
 - **OpenRouter** for LLM API access (Claude 3.5 Sonnet by default)
 - **Structured Output (Pydantic)** for reliable LLM responses
 - **Hybrid Evaluation** (deterministic rules + LLM for borderline cases)
+- **Phoenix Observability** for comprehensive tracing and monitoring
 
 ### Architecture
 

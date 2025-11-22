@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from nas_system.nas_agent import load_metrics, load_history
 from . import config as graph_config
+from .phoenix_tracing import trace_operation, add_span_attribute, add_span_event
 
 
 def apply_config_changes(config_path: Path, changes: Dict[str, Any]) -> None:
@@ -253,43 +254,56 @@ def execute_training(state: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated state with execution results
     """
-    step_type = state["step_type"]
-    
-    # Check if we should stop
-    if step_type == "stop":
+    with trace_operation("executor", {
+        "iteration": state["iteration"],
+        "step_type": state["step_type"]
+    }):
+        step_type = state["step_type"]
+        
+        # Check if we should stop
+        if step_type == "stop":
+            if graph_config.VERBOSE:
+                print("\nPlanner decided to stop. No execution needed.")
+            add_span_event("execution_skipped", {"reason": "planner_stop"})
+            state["training_success"] = False
+            return state
+        
+        config_changes = state["config_changes"]
+        iteration = state["iteration"]
+        
+        # Generate run ID
+        run_id = f"run_{iteration:04d}"
+        add_span_attribute("run_id", run_id)
+        add_span_attribute("num_changes", len(config_changes))
+        
         if graph_config.VERBOSE:
-            print("\nPlanner decided to stop. No execution needed.")
-        state["training_success"] = False
+            print("\n" + "=" * 80)
+            print(f"EXECUTOR - Running iteration {iteration}")
+            print("=" * 80)
+            print(f"Applying {len(config_changes)} config changes...")
+        
+        try:
+            # Apply config changes
+            with trace_operation("apply_config_changes", {"changes": config_changes}):
+                apply_config_changes(graph_config.CONFIG_PATH, config_changes)
+            
+            if graph_config.VERBOSE:
+                print("Config changes applied successfully")
+            
+            add_span_event("config_modified")
+            
+            # Run training
+            with trace_operation("training_run", {"run_id": run_id}):
+                run_training(graph_config.CONFIG_PATH, run_id)
+            
+            add_span_event("training_completed", {"success": True})
+            state["current_run_id"] = run_id
+            state["training_success"] = True
+            
+        except Exception as e:
+            print(f"\nError during execution: {e}")
+            add_span_event("execution_error", {"error": str(e)})
+            state["current_run_id"] = run_id
+            state["training_success"] = False
+        
         return state
-    
-    config_changes = state["config_changes"]
-    iteration = state["iteration"]
-    
-    # Generate run ID
-    run_id = f"run_{iteration:04d}"
-    
-    if graph_config.VERBOSE:
-        print("\n" + "=" * 80)
-        print(f"EXECUTOR - Running iteration {iteration}")
-        print("=" * 80)
-        print(f"Applying {len(config_changes)} config changes...")
-    
-    try:
-        # Apply config changes
-        apply_config_changes(graph_config.CONFIG_PATH, config_changes)
-        
-        if graph_config.VERBOSE:
-            print("Config changes applied successfully")
-        
-        # Run training
-        run_training(graph_config.CONFIG_PATH, run_id)
-        
-        state["current_run_id"] = run_id
-        state["training_success"] = True
-        
-    except Exception as e:
-        print(f"\nError during execution: {e}")
-        state["current_run_id"] = run_id
-        state["training_success"] = False
-    
-    return state

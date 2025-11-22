@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from nas_system.nas_agent import load_agent_state, get_best_run
 from .graph import build_nas_graph, NASGraphState
 from . import config as graph_config
+from .phoenix_tracing import setup_phoenix_tracing
 
 
 def run_nas_optimization(max_iterations: int = 20) -> None:
@@ -48,6 +49,12 @@ def run_nas_optimization(max_iterations: int = 20) -> None:
     print(f"Max iterations: {max_iterations}")
     print(f"Using model: {graph_config.PLANNER_MODEL}")
     print(f"NAS system root: {graph_config.NAS_SYSTEM_ROOT}")
+    
+    # Initialize Phoenix tracing
+    phoenix_enabled = setup_phoenix_tracing()
+    if phoenix_enabled:
+        print(f"Phoenix tracing: http://{graph_config.PHOENIX_HOST}:{graph_config.PHOENIX_PORT}")
+    
     print("=" * 80)
     
     # Load existing agent state to determine starting iteration

@@ -24,6 +24,7 @@ from nas_system.nas_agent import (
 from .executor import load_run_results
 from .prompts import EVALUATOR_PROMPT
 from . import config as graph_config
+from .phoenix_tracing import trace_operation, add_span_attribute, add_span_event
 
 
 class EvaluatorDecision(BaseModel):
@@ -186,81 +187,113 @@ def evaluate_run(state: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated state with evaluation decision
     """
-    if not state["training_success"]:
+    with trace_operation("evaluator", {
+        "run_id": state.get("current_run_id", "unknown"),
+        "training_success": state["training_success"]
+    }):
+        if not state["training_success"]:
+            if graph_config.VERBOSE:
+                print("\n" + "=" * 80)
+                print("EVALUATOR - Training failed")
+                print("=" * 80)
+            
+            add_span_event("evaluation_skipped", {"reason": "training_failed"})
+            state["accept_run"] = False
+            state["evaluation_reason"] = "Training execution failed"
+            state["feedback"] = "Fix training issues before proceeding"
+            return state
+        
+        run_id = state["current_run_id"]
+        add_span_attribute("run_id", run_id)
+        
         if graph_config.VERBOSE:
             print("\n" + "=" * 80)
-            print("EVALUATOR - Training failed")
+            print(f"EVALUATOR - Evaluating {run_id}")
             print("=" * 80)
-        
-        state["accept_run"] = False
-        state["evaluation_reason"] = "Training execution failed"
-        state["feedback"] = "Fix training issues before proceeding"
-        return state
     
-    run_id = state["current_run_id"]
-    
-    if graph_config.VERBOSE:
-        print("\n" + "=" * 80)
-        print(f"EVALUATOR - Evaluating {run_id}")
-        print("=" * 80)
-    
-    # Load run results
-    try:
-        metrics, history = load_run_results(run_id)
-    except Exception as e:
-        print(f"Error loading run results: {e}")
-        state["accept_run"] = False
-        state["evaluation_reason"] = f"Failed to load results: {e}"
-        state["feedback"] = "Check run output files"
-        return state
-    
-    # Load agent state to get best run
-    agent_state = load_agent_state(graph_config.AGENT_STATE_PATH)
-    best_run = get_best_run(agent_state)
-    
-    best_metrics = None
-    if best_run:
-        best_run_dir = graph_config.RUNS_ROOT / best_run.run_id
+        # Load run results
         try:
-            from nas_system.nas_agent import load_metrics
-            best_metrics = load_metrics(best_run_dir)
-        except:
-            pass
-    
-    # Deterministic evaluation
-    decision, reason = evaluate_run_deterministic(metrics, best_metrics, history)
-    
-    if decision is not None:
-        # Clear decision from rules
-        if graph_config.VERBOSE:
-            print(f"Deterministic decision: {'Accept' if decision else 'Reject'}")
-            print(f"Reason: {reason}")
+            metrics, history = load_run_results(run_id)
+            add_span_attribute("val_mse", f"{metrics.get('val_mse', 0):.6f}")
+            add_span_attribute("test_mse", f"{metrics.get('test_mse', 0):.6f}")
+            add_span_event("metrics_loaded")
+        except Exception as e:
+            print(f"Error loading run results: {e}")
+            add_span_event("evaluation_error", {"error": str(e)})
+            state["accept_run"] = False
+            state["evaluation_reason"] = f"Failed to load results: {e}"
+            state["feedback"] = "Check run output files"
+            return state
         
-        state["accept_run"] = decision
-        state["evaluation_reason"] = reason
-        state["feedback"] = "Continue exploring" if decision else "Try different approach"
+        # Load agent state to get best run
+        agent_state = load_agent_state(graph_config.AGENT_STATE_PATH)
+        best_run = get_best_run(agent_state)
         
-    else:
-        # Borderline case - use LLM
-        if graph_config.VERBOSE:
-            print(f"Borderline case: {reason}")
-            print("Consulting LLM evaluator...")
+        best_metrics = None
+        if best_run:
+            best_run_dir = graph_config.RUNS_ROOT / best_run.run_id
+            try:
+                from nas_system.nas_agent import load_metrics
+                best_metrics = load_metrics(best_run_dir)
+                add_span_attribute("best_val_mse", f"{best_metrics.get('val_mse', 0):.6f}")
+            except:
+                pass
         
-        best_run_id = best_run.run_id if best_run else "None"
-        accept, llm_reason, feedback = evaluate_with_llm(
-            run_id, metrics,
-            best_run_id, best_metrics or {},
-            history,
-            state["config_changes"]
-        )
+        # Deterministic evaluation
+        with trace_operation("deterministic_evaluation"):
+            decision, reason = evaluate_run_deterministic(metrics, best_metrics, history)
         
-        if graph_config.VERBOSE:
-            print(f"LLM decision: {'Accept' if accept else 'Reject'}")
-            print(f"Reason: {llm_reason}")
-            print(f"Feedback: {feedback}")
+        if decision is not None:
+            # Clear decision from rules
+            if graph_config.VERBOSE:
+                print(f"Deterministic decision: {'Accept' if decision else 'Reject'}")
+                print(f"Reason: {reason}")
+            
+            add_span_attribute("evaluation_method", "deterministic")
+            add_span_attribute("decision", "accept" if decision else "reject")
+            add_span_event("decision_made", {
+                "method": "deterministic",
+                "decision": "accept" if decision else "reject",
+                "reason": reason
+            })
+            
+            state["accept_run"] = decision
+            state["evaluation_reason"] = reason
+            state["feedback"] = "Continue exploring" if decision else "Try different approach"
+            
+        else:
+            # Borderline case - use LLM
+            if graph_config.VERBOSE:
+                print(f"Borderline case: {reason}")
+                print("Consulting LLM evaluator...")
+            
+            add_span_event("borderline_case", {"reason": reason})
+            
+            best_run_id = best_run.run_id if best_run else "None"
+            
+            with trace_operation("llm_evaluation"):
+                accept, llm_reason, feedback = evaluate_with_llm(
+                    run_id, metrics,
+                    best_run_id, best_metrics or {},
+                    history,
+                    state["config_changes"]
+                )
+            
+            if graph_config.VERBOSE:
+                print(f"LLM decision: {'Accept' if accept else 'Reject'}")
+                print(f"Reason: {llm_reason}")
+                print(f"Feedback: {feedback}")
+            
+            add_span_attribute("evaluation_method", "llm")
+            add_span_attribute("decision", "accept" if accept else "reject")
+            add_span_event("decision_made", {
+                "method": "llm",
+                "decision": "accept" if accept else "reject",
+                "reason": llm_reason
+            })
+            
+            state["accept_run"] = accept
+            state["evaluation_reason"] = f"[LLM] {llm_reason}"
+            state["feedback"] = feedback
         
-        state["accept_run"] = accept
-        state["evaluation_reason"] = f"[LLM] {llm_reason}"
-        state["feedback"] = feedback
-    
-    return state
+        return state
