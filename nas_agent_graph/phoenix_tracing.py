@@ -38,6 +38,7 @@ def setup_phoenix_tracing() -> bool:
     try:
         from phoenix.otel import register
         from openinference.instrumentation.langchain import LangChainInstrumentor
+        from openinference.instrumentation.openai import OpenAIInstrumentor
         
         # Register Phoenix tracer with custom endpoint
         tracer_provider = register(
@@ -48,16 +49,20 @@ def setup_phoenix_tracing() -> bool:
         # Instrument LangChain
         LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
         
+        # Instrument OpenAI (for ChatOpenAI calls with prompts/responses)
+        OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+        
         if graph_config.VERBOSE:
             print(f"✓ Phoenix tracing enabled at {graph_config.PHOENIX_COLLECTOR_ENDPOINT}")
             print(f"  View traces at: http://{graph_config.PHOENIX_HOST}:{graph_config.PHOENIX_PORT}")
+            print(f"  Instrumented: LangChain, OpenAI")
         
         _phoenix_initialized = True
         return True
         
     except ImportError as e:
         print(f"⚠ Phoenix tracing unavailable: {e}")
-        print("  Install with: pip install arize-phoenix openinference-instrumentation-langchain")
+        print("  Install with: pip install arize-phoenix openinference-instrumentation-langchain openinference-instrumentation-openai")
         return False
         
     except Exception as e:

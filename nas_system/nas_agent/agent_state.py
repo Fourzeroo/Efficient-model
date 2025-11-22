@@ -6,8 +6,8 @@ maintaining the best performing model, and enabling LLM agents to make informed
 decisions about architecture search progress.
 """
 
-from dataclasses import dataclass, asdict
-from typing import List, Optional
+from dataclasses import dataclass, asdict, field
+from typing import List, Optional, Dict, Any
 from pathlib import Path
 import json
 
@@ -23,12 +23,14 @@ class RunInfo:
         test_mse: Test MSE achieved by this run
         history_summary: Textual summary of learning dynamics
         accepted: Whether this run was accepted by the NAS agent
+        config_changes: Dictionary of config changes applied for this run
     """
     run_id: str
     val_mse: float
     test_mse: float
     history_summary: str
     accepted: bool = True
+    config_changes: Optional[dict] = None
 
 
 @dataclass
@@ -76,8 +78,13 @@ def load_agent_state(path: Path = Path("agent_state.json")) -> AgentState:
     with open(path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    # Reconstruct RunInfo objects
-    runs = [RunInfo(**run_data) for run_data in data.get("runs", [])]
+    # Reconstruct RunInfo objects with backward compatibility
+    runs = []
+    for run_data in data.get("runs", []):
+        # Handle old data without config_changes field
+        if "config_changes" not in run_data:
+            run_data["config_changes"] = None
+        runs.append(RunInfo(**run_data))
     
     return AgentState(
         max_runs=data.get("max_runs", 100),

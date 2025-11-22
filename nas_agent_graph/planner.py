@@ -142,6 +142,12 @@ def plan_next_iteration(state: Dict[str, Any]) -> Dict[str, Any]:
         # Invoke LLM
         try:
             add_span_event("llm_invocation_start")
+            
+            # Log prompt for debugging (Phoenix should capture this via OpenAI instrumentor)
+            if graph_config.DEBUG:
+                add_span_attribute("prompt_length", len(prompt))
+                add_span_attribute("prompt_preview", prompt[:500])
+            
             messages = [HumanMessage(content=prompt)]
             decision = structured_llm.invoke(messages)
             

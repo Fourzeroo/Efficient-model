@@ -45,12 +45,12 @@ model = {
     "seq_len": 336,      # Input sequence length
     "label_len": 24,     # Start token length
     "pred_len": 96,      # Prediction length
-    "d_model": 512,      # Model dimension
-    "n_heads": 16,       # Number of attention heads
+    "d_model": 256,      # Model dimension
+    "n_heads": 8,       # Number of attention heads
     "e_layers": 3,       # Number of encoder layers
     "d_layers": 1,       # Number of decoder layers
-    "d_ff": 1024,        # Feedforward network dimension
-    "dropout": 0.337,    # Dropout rate
+    "d_ff": 512,        # Feedforward network dimension
+    "dropout": 0.25,    # Dropout rate
     "factor": 4,         # ProbSparse attention factor
 }
 
@@ -58,10 +58,10 @@ model = {
 # Training configuration
 training = {
     # Optimization (from best Optuna params)
-    "optimizer_class": optim.Adam,  # Can be changed to optim.AdamW, optim.SGD, etc.
+    "optimizer_class": optim.AdamW,  # Can be changed to optim.AdamW, optim.SGD, etc.
     "optimizer_params": {
-        "lr": 1.603e-05,            # Learning rate
-        "weight_decay": 0.0,
+        "lr": 5e-05,            # Learning rate
+        "weight_decay": 0.0001,
         # "betas": (0.9, 0.999),    # For Adam/AdamW
         # "momentum": 0.9,          # For SGD
     },
@@ -70,7 +70,7 @@ training = {
     "use_scheduler": True,
     "scheduler_class": optim.lr_scheduler.CosineAnnealingLR,  # Can be changed
     "scheduler_params": {
-        "T_max": 10,
+        "T_max": 20,
         # "step_size": 10,          # For StepLR
         # "gamma": 0.5,             # For StepLR
         # "patience": 3,            # For ReduceLROnPlateau

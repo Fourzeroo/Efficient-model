@@ -161,6 +161,11 @@ def evaluate_with_llm(
     if graph_config.VERBOSE:
         print("\nEvaluator LLM invoked for borderline case...")
     
+    # Log prompt for debugging
+    if graph_config.DEBUG:
+        add_span_attribute("evaluator_prompt_length", len(prompt))
+        add_span_attribute("evaluator_prompt_preview", prompt[:500])
+    
     # Create LLM with structured output
     llm = create_evaluator_llm()
     structured_llm = llm.with_structured_output(EvaluatorDecision)

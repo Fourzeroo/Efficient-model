@@ -117,7 +117,8 @@ def update_state_node(state: NASGraphState) -> NASGraphState:
                 val_mse=metrics["val_mse"],
                 test_mse=metrics["test_mse"],
                 history_summary=history_summary,
-                accepted=state["accept_run"]
+                accepted=state["accept_run"],
+                config_changes=state.get("config_changes", {})
             )
             
             # Add to state

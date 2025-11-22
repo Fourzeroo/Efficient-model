@@ -65,7 +65,7 @@ python -m nas_agent_graph.main --max-iterations 20 --verbose
 
 ### Одна итерация NAS
 
-1. **Planner**: Анализирует контекст (лучший запуск, последние 5, конфиг)
+1. **Planner**: Анализирует контекст (лучший запуск, последние 5 с изменениями, конфиг)
 2. **Planner**: Решает что изменить и возвращает изменения
 3. **Executor**: Модифицирует `config.py` и запускает обучение
 4. **Evaluator**: Оценивает результаты (правила → LLM при неясности)
@@ -112,6 +112,49 @@ nas_agent_graph/
 └── requirements.txt         # Зависимости
 ```
 
+## Отслеживание изменений конфигурации
+
+### Автоматическое отслеживание
+
+Система автоматически сохраняет все примененные изменения конфигурации для каждого запуска:
+
+- **Что отслеживается**: Все изменения из `config_changes`, примененные Executor'ом
+- **Где хранится**: В поле `config_changes` каждого `RunInfo` в `agent_state.json`
+- **Как используется**: Планировщик видит эти изменения в промпте и может анализировать их влияние
+- **Преимущества**:
+  - Избежание повторения неудачных экспериментов
+  - Понимание влияния конкретных параметров
+  - Выявление закономерностей в истории оптимизации
+  - Обоснованное принятие решений о следующих шагах
+
+### Формат в промпте планировщика
+
+```
+Recent Runs History:
+
+- run_0004: val_mse=0.212354, test_mse=1.500534 (✗ Rejected)
+  Changes applied: {
+    "training.optimizer_params.lr": 0.0005,
+    "model.dropout": 0.4
+  }
+  Training summary: 6 epochs, overfitting detected...
+
+- run_0005: val_mse=0.150000, test_mse=0.160000 (✓ Accepted)
+  Changes applied: {
+    "training.optimizer_params.lr": 0.0001,
+    "model.d_model": 256,
+    "training.dropout": 0.2
+  }
+  Training summary: 8 epochs, stable convergence...
+```
+
+### Обратная совместимость
+
+Старые запуски без поля `config_changes` автоматически обрабатываются:
+- При загрузке устанавливается `config_changes = None`
+- В промпте показывается "(not recorded)"
+- Новые запуски автоматически сохраняют изменения
+
 ## Результаты
 
 ### Agent State (`nas_system/agent_state.json`)
@@ -124,7 +167,12 @@ nas_agent_graph/
       "run_id": "run_0000",
       "val_mse": 0.1855,
       "test_mse": 0.1923,
-      "accepted": true
+      "history_summary": "8 epochs, best_epoch=5...",
+      "accepted": true,
+      "config_changes": {
+        "training.optimizer_params.lr": 0.0001,
+        "model.d_model": 256
+      }
     }
   ]
 }
@@ -139,6 +187,32 @@ nas_agent_graph/
 - `config_used.py` - Снапшот конфига
 
 ## Дополнительно
+
+### Трейсинг с Phoenix (Observability)
+
+Система поддерживает автоматическое логирование в **Phoenix** для наблюдения за LLM вызовами:
+
+```bash
+# 1. Установить зависимости
+pip install openinference-instrumentation-openai
+
+# 2. Запустить Phoenix server
+python -m phoenix.server.main serve
+
+# 3. Запустить NAS (Phoenix включен по умолчанию)
+python quickstart_nas_graph.py
+```
+
+Phoenix UI: http://localhost:6006
+
+**Что видно в Phoenix:**
+- ✓ Полные промпты для Planner и Evaluator
+- ✓ Ответы от LLM (включая structured output)
+- ✓ Метаинформация (модель, температура, токены)
+- ✓ Время выполнения каждого вызова
+- ✓ Иерархия операций (Graph → Planner → LLM)
+
+**Подробнее:** См. [PHOENIX_SETUP.md](./PHOENIX_SETUP.md)
 
 ### Возобновление работы
 

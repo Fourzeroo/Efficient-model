@@ -12,8 +12,13 @@ Current State:
 - Best validation MSE: {best_val_mse:.6f}
 - Best run ID: {best_run_id}
 
-Recent Runs:
+Recent Runs History:
 {recent_runs_summary}
+
+NOTE: For each run above, you can see:
+1. Metrics (val_mse, test_mse) and acceptance status
+2. **Config changes that were applied** - this shows what was modified from the previous run
+3. Training dynamics summary (overfitting signals, convergence behavior)
 
 Current Config (Python module config.py):
 ```python
@@ -21,12 +26,13 @@ Current Config (Python module config.py):
 ```
 
 Task:
-Analyze the history and decide what to try next. Consider:
+Analyze the history INCLUDING the config changes that were tried and their outcomes. Consider:
 - Learning dynamics (overfitting, underfitting, instability)
 - Model capacity (too small or too large)
 - Training hyperparameters (learning rate too high/low, batch size)
 - Optimization and scheduler behavior
 - Regularization (dropout, weight decay)
+- **What changes have already been tried and whether they helped or hurt performance**
 
 Choose step_type:
 - "small": Fine-tune hyperparameters (small LR changes, batch size tweaks, dropout adjustments, weight decay).
@@ -122,7 +128,17 @@ def format_recent_runs(runs, k=5):
         lines.append(
             f"- {run.run_id}: val_mse={run.val_mse:.6f}, test_mse={run.test_mse:.6f} ({status})"
         )
-        lines.append(f"  Summary: {run.history_summary[:200]}...")  # Truncate for brevity
+        
+        # Show config changes if available
+        if run.config_changes:
+            import json
+            changes_str = json.dumps(run.config_changes, indent=4)
+            lines.append(f"  Changes applied: {changes_str}")
+        else:
+            lines.append("  Changes applied: (not recorded)")
+        
+        lines.append(f"  Training summary: {run.history_summary[:200]}...")  # Truncate for brevity
+        lines.append("")  # Empty line for readability
     
     return "\n".join(lines)
 
