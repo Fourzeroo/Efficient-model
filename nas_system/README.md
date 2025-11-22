@@ -336,12 +336,3 @@ data = {
 
 Нормально отклонение ±0.01-0.02 MSE.
 Для воспроизводимости: установить `seed: 42` в config.
-
-## Лицензия
-
-Та же, что и у родительского проекта.
-
-## Благодарности
-
-- **Informer**: [Informer2020](https://github.com/zhouhaoyi/Informer2020)
-- **ETT Dataset**: [ETDataset](https://github.com/zhouhaoyi/ETDataset)
